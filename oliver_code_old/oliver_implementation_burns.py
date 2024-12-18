@@ -92,13 +92,13 @@ def llama_hs_from_tokens(model, input_ids, layer=-1):
 
     hs_tuple = output["hidden_states"]
     hs = hs_tuple[layer][0, -1].detach().cpu().numpy()
-
     return hs
 
 
 # Extract LLaMA hidden states from a string of text.
 # Optionally add an EOS token to the end of the input.
 # Returns activations from the layer numbered `layer` (or -1 for last layer)
+plt.savefig("log_scale_convergence.svg")
 def llama_hs_from_text(model, tokenizer, text, layer=-1, add_eos=True):
     if add_eos:
         text = text + tokenizer.eos_token
