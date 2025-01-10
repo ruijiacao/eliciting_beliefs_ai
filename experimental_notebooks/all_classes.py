@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import copy
+import numpy as np
 
 # Define all classes we will need
 class MLPProbe(nn.Module):
@@ -17,7 +18,7 @@ class MLPProbe(nn.Module):
 
 class CCS(object):
     def __init__(self, x0, x1, nepochs=1000, ntries=10, lr=1e-3, batch_size=-1, 
-                 verbose=False, device="cpu", linear=True, weight_decay=0.01, var_normalize=False):
+                 verbose=False, device="cpu", linear=True, num_vec = 1, weight_decay=0.01, var_normalize=False):
         # data
         self.var_normalize = var_normalize
         self.x0 = self.normalize(x0)
@@ -35,13 +36,14 @@ class CCS(object):
         
         # probe
         self.linear = linear
+        self.num_vec = num_vec # number of truth vectors in the linear probe
         self.initialize_probe()
         self.best_probe = copy.deepcopy(self.probe)
 
         
     def initialize_probe(self):
         if self.linear:
-            self.probe = nn.Sequential(nn.Linear(self.d, 1), nn.Sigmoid())
+            self.probe = nn.Sequential(nn.Linear(self.d, self.num_vec), nn.AvgPool1d(kernel_size = self.num_vec), nn.Sigmoid())
         else:
             self.probe = MLPProbe(self.d)
         self.probe.to(self.device)    
@@ -136,3 +138,5 @@ class CCS(object):
                 best_loss = loss
 
         return best_loss
+
+# class TruthVerifier(object):

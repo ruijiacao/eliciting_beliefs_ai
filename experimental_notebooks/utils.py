@@ -1,7 +1,7 @@
 # File containing useful functions
 import torch
 import numpy as np
-import tqdm
+from tqdm import tqdm
 
 def get_encoder_hidden_states(model, tokenizer, input_text, layer=-1):
     """
@@ -127,8 +127,8 @@ def get_hidden_states_many_examples(model, tokenizer, data, dataset_name, model_
                 break
                 
         # get hidden states
-        neg_hs = get_hidden_states(model, tokenizer, format_imdb_2(text, 0), model_type=model_type)
-        pos_hs = get_hidden_states(model, tokenizer, format_imdb_2(text, 1), model_type=model_type)
+        neg_hs = get_hidden_states(model, tokenizer, format_imdb(text, 0), model_type=model_type)
+        pos_hs = get_hidden_states(model, tokenizer, format_imdb(text, 1), model_type=model_type)
 
         # collect
         all_neg_hs.append(neg_hs)
