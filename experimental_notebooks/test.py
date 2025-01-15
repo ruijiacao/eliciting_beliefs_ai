@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
+import numpy as np
 
-# pool with window of size=3, stride=2
-v = torch.tensor([[1., 2, 3, 4, 5, 6, 7]])
-m = nn.AvgPool1d(kernel_size=7)
-print(m(v))
+test = np.array([[[2, 1], [1, 1]], [[2, 3], [2, 2]], [[3, 3], [2.1, 1.0]]])
+print(test.shape)
+
