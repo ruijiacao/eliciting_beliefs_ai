@@ -122,9 +122,9 @@ def format_amazon(text, label):
     return "The following review expresses a " + ["negative", "positive"][label] + " sentiment:\n" + text
 
 
-def get_hidden_states_many_examples(model, tokenizer, data, dataset_name, model_type, n=100):
+def get_hidden_states_many_examples(model, tokenizer, data, dataset_name, model_type, layer = -1, n=100):
     """
-    Given an encoder-decoder model, a list of data, computes the contrast hidden states on n random examples.
+    Given an encoder-decoder model, a list of data, computes the contrast hidden states on n random examples by probing the specified layer.
     Returns numpy arrays of shape (n, hidden_dim) for each candidate label, along with a boolean numpy array of shape (n,)
     with the ground truth labels
     
@@ -150,8 +150,8 @@ def get_hidden_states_many_examples(model, tokenizer, data, dataset_name, model_
                 break
                 
         # get hidden states
-        neg_hs = get_hidden_states(model, tokenizer, format_imdb(text, 0), model_type=model_type)
-        pos_hs = get_hidden_states(model, tokenizer, format_imdb(text, 1), model_type=model_type)
+        neg_hs = get_hidden_states(model, tokenizer, format_imdb(text, 0), layer = layer, model_type=model_type)
+        pos_hs = get_hidden_states(model, tokenizer, format_imdb(text, 1), layer = layer, model_type=model_type)
 
         # collect
         all_neg_hs.append(neg_hs)
@@ -164,44 +164,22 @@ def get_hidden_states_many_examples(model, tokenizer, data, dataset_name, model_
 
     return all_neg_hs, all_pos_hs, all_gt_labels
 
-def get_hidden_states_many_examples_all(model, tokenizer, data, dataset_name, model_type, n=100):
-    """
-    Given an encoder-decoder model, a list of data, computes the contrast hidden states on n random examples.
-    Returns numpy arrays of shape (n, hidden_dim, num_layers) for each candidate label, along with a boolean numpy array of shape (n,)
-    with the ground truth labels
-    
-    This is deliberately simple so that it's easy to understand, rather than being optimized for efficiency
-    """
-    # setup
-    model.eval()
-    all_neg_hs, all_pos_hs, all_gt_labels = [], [], []
+def get_random_samples(model, tokenizer, data, dataset_name, model_type, layer = -1):
+    # for simplicity, sample a random example until we find one that's a reasonable length
+    # (most examples should be a reasonable length, so this is just to make sure)
+    while True:
+        idx = np.random.randint(len(data))
+        text, true_label = "hello", 0 
+        if dataset_name == "imdb":
+            text, true_label = data[idx]["text"], data[idx]["label"]
+        else:
+            text, true_label = data[idx]["content"], data[idx]["label"]
+        # the actual formatted input will be longer, so include a bit of a marign
+        if len(tokenizer(text)) < 400:  
+            break
+    # get hidden states
+    neg_hs = get_hidden_states(model, tokenizer, format_imdb(text, 0), layer = layer, model_type=model_type)
+    pos_hs = get_hidden_states(model, tokenizer, format_imdb(text, 1), layer = layer, model_type=model_type)
 
-    # loop
-    for _ in tqdm(range(n)):
-        # for simplicity, sample a random example until we find one that's a reasonable length
-        # (most examples should be a reasonable length, so this is just to make sure)
-        while True:
-            idx = np.random.randint(len(data))
-            text, true_label = "hello", 0 
-            if dataset_name == "imdb":
-               text, true_label = data[idx]["text"], data[idx]["label"]
-            else:
-               text, true_label = data[idx]["content"], data[idx]["label"]
-            # the actual formatted input will be longer, so include a bit of a marign
-            if len(tokenizer(text)) < 400:  
-                break
-                
-        # get hidden states
-        neg_hs = get_hidden_states(model, tokenizer, format_imdb(text, 0), model_type=model_type)
-        pos_hs = get_hidden_states(model, tokenizer, format_imdb(text, 1), model_type=model_type)
+    return neg_hs, pos_hs
 
-        # collect
-        all_neg_hs.append(neg_hs)
-        all_pos_hs.append(pos_hs)
-        all_gt_labels.append(true_label)
-
-    all_neg_hs = np.stack(all_neg_hs)
-    all_pos_hs = np.stack(all_pos_hs)
-    all_gt_labels = np.stack(all_gt_labels)
-
-    return all_neg_hs, all_pos_hs, all_gt_labels
