@@ -164,22 +164,39 @@ def get_hidden_states_many_examples(model, tokenizer, data, dataset_name, model_
 
     return all_neg_hs, all_pos_hs, all_gt_labels
 
-def get_random_samples(model, tokenizer, data, dataset_name, model_type, layer = -1):
-    # for simplicity, sample a random example until we find one that's a reasonable length
-    # (most examples should be a reasonable length, so this is just to make sure)
-    while True:
+def get_hidden_states_multiple_layers(model, tokenizer, data, dataset_name, model_type, layers, num_samples = 100):
+    ''' 
+    Return all_neg_hs := a list of different hidden state representations of the complements
+           all_pos_hs := a list of different hidden state representations of the events
+           all_gt_labels := a list of true labels of the 
+    '''
+    model.eval()
+    all_neg_hs, all_pos_hs, all_gt_labels = [], [], []
+
+    for _ in tqdm(range(num_samples)):
+        # for simplicity, sample a random example until we find one that's a reasonable length
+        # (most examples should be a reasonable length, so this is just to make sure)
         idx = np.random.randint(len(data))
         text, true_label = "hello", 0 
         if dataset_name == "imdb":
             text, true_label = data[idx]["text"], data[idx]["label"]
         else:
             text, true_label = data[idx]["content"], data[idx]["label"]
-        # the actual formatted input will be longer, so include a bit of a marign
-        if len(tokenizer(text)) < 400:  
-            break
-    # get hidden states
-    neg_hs = get_hidden_states(model, tokenizer, format_imdb(text, 0), layer = layer, model_type=model_type)
-    pos_hs = get_hidden_states(model, tokenizer, format_imdb(text, 1), layer = layer, model_type=model_type)
+                
+        # get hidden states from specified layers
+        neg_hs_different_states = []
+        pos_hs_different_states = []
 
-    return neg_hs, pos_hs
+        for i in layers:
+            neg_hs = get_hidden_states(model, tokenizer, format_imdb(text, 0), layer = i, model_type=model_type)
+            pos_hs = get_hidden_states(model, tokenizer, format_imdb(text, 1), layer = i, model_type=model_type)
+            neg_hs_different_states.append(neg_hs)
+            pos_hs_different_states.append(pos_hs)
+        
+        all_neg_hs.append(neg_hs_different_states)
+        all_pos_hs.append(pos_hs_different_states)
+        all_gt_labels.append(true_label)
+    
+    return all_neg_hs, all_pos_hs, all_gt_labels
+
 

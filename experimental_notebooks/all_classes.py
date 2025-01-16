@@ -193,14 +193,31 @@ class CE:
         return x0, x1
     
 
-    def get_loss(self, p0, p1):
+    def get_loss(self, p0, p1, loss_func = "quadratic"):
         """
-        Returns the CCS loss for two probabilities each of shape (n,1) or (n,)
+        Returns the loss for two probabilities each of shape (n,1) or (n,). 
+        The loss_func is either quadratic or binary KL divergence
         """
-        informative_loss = (torch.min(p0, p1)**2).mean(0)
-        consistent_loss = ((p0 - (1-p1))**2).mean(0)
-        return informative_loss + consistent_loss
+        loss = 0
+        if loss_func == "quadratic":
+            informative_loss = (torch.min(p0, p1)**2).mean(0)
+            consistent_loss = ((p0 - (1-p1))**2).mean(0)
+            loss = informative_loss + consistent_loss
+        loss_func = (p0 - (1 - p1)**2) / ((1 + p0 - p1) * (1 + p1 - p0)) 
+        return loss
+    
 
+    def get_credence(self, x0_test, x1_test):
+        """
+        Computes credence for the current parameters on the given test inputs
+        """
+        x0 = torch.tensor(self.normalize(x0_test), dtype=torch.float, requires_grad=False, device=self.device)
+        x1 = torch.tensor(self.normalize(x1_test), dtype=torch.float, requires_grad=False, device=self.device)
+        with torch.no_grad():
+            p0, p1 = self.best_probe(x0), self.best_probe(x1)
+        avg_confidence = 0.5 * (p0 + (1 - p1))
+
+        return avg_confidence
 
     def get_acc(self, x0_test, x1_test, y_test):
         """
