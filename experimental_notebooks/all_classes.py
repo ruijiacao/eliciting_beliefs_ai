@@ -202,8 +202,9 @@ class CE:
         if loss_func == "quadratic":
             informative_loss = (torch.min(p0, p1)**2).mean(0)
             consistent_loss = ((p0 - (1-p1))**2).mean(0)
-            loss = informative_loss + consistent_loss
-        loss_func = (p0 - (1 - p1)**2) / ((1 + p0 - p1) * (1 + p1 - p0)) 
+            loss = 100 * informative_loss + consistent_loss
+            return loss
+        loss = (p0 - (1 - p1)**2) / ((1 + p0 - p1) * (1 + p1 - p0)) 
         return loss
     
 

@@ -24,7 +24,7 @@ def get_encoder_hidden_states(model, tokenizer, input_text, layer=-1):
 
     return hs
 
-def get_encoder_decoder_hidden_states(model, tokenizer, input_text, layer=-1):
+def get_encoder_decoder_hidden_states(model, tokenizer, input_text, layer=-1, token_pos = -1):
     """
     Given an encoder-decoder model and some text, gets the encoder hidden states (in a given layer, by default the last) 
     on that input text (where the full text is given to the encoder).
@@ -41,11 +41,11 @@ def get_encoder_decoder_hidden_states(model, tokenizer, input_text, layer=-1):
 
     # get the appropriate hidden states
     hs_tuple = output["encoder_hidden_states"]
-    hs = hs_tuple[layer][0, -1].detach().cpu().numpy()
+    hs = hs_tuple[layer][0, token_pos].detach().cpu().numpy()
 
     return hs
 
-def get_decoder_hidden_states(model, tokenizer, input_text, layer=-1):
+def get_decoder_hidden_states(model, tokenizer, input_text, layer=-1, token_pos = -1):
     """
     Given a decoder model and some text, gets the hidden states (in a given layer, by default the last) on that input text
 
@@ -60,7 +60,7 @@ def get_decoder_hidden_states(model, tokenizer, input_text, layer=-1):
 
     # probe the specified layer
     hs_tuple = output["hidden_states"]
-    hs = hs_tuple[layer][0, -1].detach().cpu().numpy()
+    hs = hs_tuple[layer][0, token_pos].detach().cpu().numpy()
 
     return hs
 
@@ -111,6 +111,15 @@ def format_imdb_2(text, label):
     (This is just one example of a simple, manually created prompt.)
     """
     return "Is the sentiment of " + text + " negative or positive? " + "Answer: " + ["negative", "positive"][label] 
+
+def format_imdb_3(text, label):
+    """
+    Given an imdb example ("text") and corresponding label (0 for negative, or 1 for positive), 
+    returns a zero-shot prompt for that example (which includes that label as the answer).
+    
+    (This is just one example of a simple, manually created prompt.)
+    """
+    return "Consider the sentiment of the following movie review:\n" + text + "\nDoes the above movie review express a " + ["negative", "positive"][label] + " sentiment? " + "Answer: " + "Yes"
 
 def format_amazon(text, label):
     """
