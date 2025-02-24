@@ -171,6 +171,9 @@ class CE:
             self.probe = MLPProbe(self.d)
         self.probe.to(self.device)    
 
+    def get_best_probe(self):
+        return self.best_probe
+
 
     def normalize(self, x):
         """
@@ -203,8 +206,9 @@ class CE:
             informative_loss = (torch.min(p0, p1)**2).mean(0)
             consistent_loss = ((p0 - (1-p1))**2).mean(0)
             loss = 100 * informative_loss + consistent_loss
-            return loss
-        loss = (p0 - (1 - p1)**2) / ((1 + p0 - p1) * (1 + p1 - p0)) 
+            # return loss
+        else:
+            loss = (p0 - (1 - p1)**2) / ((1 + p0 - p1) * (1 + p1 - p0)) 
         return loss
     
 

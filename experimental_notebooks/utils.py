@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 
-def get_encoder_hidden_states(model, tokenizer, input_text, layer=-1):
+def get_encoder_hidden_states(model, tokenizer, input_text, token_pos, layer=-1):
     """
     Given an encoder model and some text, gets the encoder hidden states (in a given layer, by default the last) 
     on that input text (where the full text is given to the encoder).
@@ -20,11 +20,11 @@ def get_encoder_hidden_states(model, tokenizer, input_text, layer=-1):
     # get the appropriate hidden states
     hs_tuple = output["hidden_states"]
     
-    hs = hs_tuple[layer][0, -1].detach().cpu().numpy()
+    hs = hs_tuple[layer][0, token_pos].detach().cpu().numpy()
 
     return hs
 
-def get_encoder_decoder_hidden_states(model, tokenizer, input_text, layer=-1, token_pos = -1):
+def get_encoder_decoder_hidden_states(model, tokenizer, input_text, token_pos, layer):
     """
     Given an encoder-decoder model and some text, gets the encoder hidden states (in a given layer, by default the last) 
     on that input text (where the full text is given to the encoder).
@@ -45,7 +45,7 @@ def get_encoder_decoder_hidden_states(model, tokenizer, input_text, layer=-1, to
 
     return hs
 
-def get_decoder_hidden_states(model, tokenizer, input_text, layer=-1, token_pos = -1):
+def get_decoder_hidden_states(model, tokenizer, input_text, token_pos, layer):
     """
     Given a decoder model and some text, gets the hidden states (in a given layer, by default the last) on that input text
 
@@ -58,43 +58,20 @@ def get_decoder_hidden_states(model, tokenizer, input_text, layer=-1, token_pos 
     with torch.no_grad():
         output = model(input_ids, output_hidden_states=True)
 
-    # probe the specified layer
+    # probe the specified layer and token position
     hs_tuple = output["hidden_states"]
     hs = hs_tuple[layer][0, token_pos].detach().cpu().numpy()
 
     return hs
 
-def get_decoder_hidden_states_all(model, tokenizer, input_text, num_layer = 16):
-    """
-    Given a decoder model and some text, gets the hidden states from all layers on that input text. The default number of layers is 16
-
-    Returns a numpy array of shape (hidden_dim, num_layer)
-    """
-    # tokenize (adding the EOS token this time)
-    input_ids = tokenizer(input_text + tokenizer.eos_token, return_tensors="pt").input_ids.to(model.device)
-
-    # forward pass
-    with torch.no_grad():
-        output = model(input_ids, output_hidden_states=True)
-
-    # probe the specified layer
-    hs_tuple = output["hidden_states"]
-    hs = []
-    for layer in range(num_layer):
-        print(layer)
-        cur_hidden = hs_tuple[layer][0, -1].detach().cpu().numpy()
-        hs.append(cur_hidden) 
-
-    return np.array(hs)
-
-def get_hidden_states(model, tokenizer, input_text, layer=-1, model_type="encoder"):
+def get_hidden_states(model, tokenizer, input_text, token_pos, layer, model_type="encoder"):
     fn = {"encoder": get_encoder_hidden_states, "encoder_decoder": get_encoder_decoder_hidden_states,
           "decoder": get_decoder_hidden_states}[model_type]
 
-    return fn(model, tokenizer, input_text, layer=layer)
+    return fn(model, tokenizer, input_text, token_pos, layer)
 
 # Functions for formating contrasting pairs
-def format_imdb(text, label):
+def format_imdb_1(text, label):
     """
     Given an imdb example ("text") and corresponding label (0 for negative, or 1 for positive), 
     returns a zero-shot prompt for that example (which includes that label as the answer).
@@ -121,6 +98,10 @@ def format_imdb_3(text, label):
     """
     return "Consider the sentiment of the following movie review:\n" + text + "\nDoes the above movie review express a " + ["negative", "positive"][label] + " sentiment? " + "Answer: " + "Yes"
 
+def format_imdb(version, text, label):
+    prompt_form = {"imdb_1": format_imdb_1, "imdb_2": format_imdb_2, "imdb_3": format_imdb_3}[version]
+    return prompt_form(text, label)
+
 def format_amazon(text, label):
     """
     Given an Amazon review example ("text") and corresponding label (0 for negative, or 1 for positive), 
@@ -131,53 +112,53 @@ def format_amazon(text, label):
     return "The following review expresses a " + ["negative", "positive"][label] + " sentiment:\n" + text
 
 
-def get_hidden_states_many_examples(model, tokenizer, data, dataset_name, model_type, layer = -1, n=100):
-    """
-    Given an encoder-decoder model, a list of data, computes the contrast hidden states on n random examples by probing the specified layer.
-    Returns numpy arrays of shape (n, hidden_dim) for each candidate label, along with a boolean numpy array of shape (n,)
-    with the ground truth labels
+# def get_hidden_states_many_examples(model, tokenizer, data, dataset_name, model_type, layer = -1, n=100):
+#     """
+#     Given an encoder-decoder model, a list of data, computes the contrast hidden states on n random examples by probing the specified layer.
+#     Returns numpy arrays of shape (n, hidden_dim) for each candidate label, along with a boolean numpy array of shape (n,)
+#     with the ground truth labels
     
-    This is deliberately simple so that it's easy to understand, rather than being optimized for efficiency
-    """
-    # setup
-    model.eval()
-    all_neg_hs, all_pos_hs, all_gt_labels = [], [], []
+#     This is deliberately simple so that it's easy to understand, rather than being optimized for efficiency
+#     """
+#     # setup
+#     model.eval()
+#     all_neg_hs, all_pos_hs, all_gt_labels = [], [], []
 
-    # loop
-    for _ in tqdm(range(n)):
-        # for simplicity, sample a random example until we find one that's a reasonable length
-        # (most examples should be a reasonable length, so this is just to make sure)
-        while True:
-            idx = np.random.randint(len(data))
-            text, true_label = "hello", 0 
-            if dataset_name == "imdb":
-               text, true_label = data[idx]["text"], data[idx]["label"]
-            else:
-               text, true_label = data[idx]["content"], data[idx]["label"]
-            # the actual formatted input will be longer, so include a bit of a marign
-            if len(tokenizer(text)) < 400:  
-                break
+#     # loop
+#     for _ in tqdm(range(n)):
+#         # for simplicity, sample a random example until we find one that's a reasonable length
+#         # (most examples should be a reasonable length, so this is just to make sure)
+#         while True:
+#             idx = np.random.randint(len(data))
+#             text, true_label = "hello", 0 
+#             if dataset_name == "imdb":
+#                text, true_label = data[idx]["text"], data[idx]["label"]
+#             else:
+#                text, true_label = data[idx]["content"], data[idx]["label"]
+#             # the actual formatted input will be longer, so include a bit of a marign
+#             if len(tokenizer(text)) < 400:  
+#                 break
                 
-        # get hidden states
-        neg_hs = get_hidden_states(model, tokenizer, format_imdb(text, 0), layer = layer, model_type=model_type)
-        pos_hs = get_hidden_states(model, tokenizer, format_imdb(text, 1), layer = layer, model_type=model_type)
+#         # get hidden states
+#         neg_hs = get_hidden_states(model, tokenizer, format_imdb(text, 0), layer = layer, model_type=model_type)
+#         pos_hs = get_hidden_states(model, tokenizer, format_imdb(text, 1), layer = layer, model_type=model_type)
 
-        # collect
-        all_neg_hs.append(neg_hs)
-        all_pos_hs.append(pos_hs)
-        all_gt_labels.append(true_label)
+#         # collect
+#         all_neg_hs.append(neg_hs)
+#         all_pos_hs.append(pos_hs)
+#         all_gt_labels.append(true_label)
 
-    all_neg_hs = np.stack(all_neg_hs)
-    all_pos_hs = np.stack(all_pos_hs)
-    all_gt_labels = np.stack(all_gt_labels)
+#     all_neg_hs = np.stack(all_neg_hs)
+#     all_pos_hs = np.stack(all_pos_hs)
+#     all_gt_labels = np.stack(all_gt_labels)
 
-    return all_neg_hs, all_pos_hs, all_gt_labels
+#     return all_neg_hs, all_pos_hs, all_gt_labels
 
-def get_hidden_states_multiple_layers(model, tokenizer, data, dataset_name, model_type, layers, num_samples = 100):
+# def get_hidden_states_aggregate(model, tokenizer, data, dataset_name, model_type, layers, token_pos = -1, num_samples = 100):
     ''' 
     Return all_neg_hs := a list of different hidden state representations of the complements
            all_pos_hs := a list of different hidden state representations of the events
-           all_gt_labels := a list of true labels of the 
+           all_gt_labels := a list of true labels of the true labels
     '''
     model.eval()
     all_neg_hs, all_pos_hs, all_gt_labels = [], [], []
