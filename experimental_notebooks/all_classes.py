@@ -223,6 +223,20 @@ class CE:
         avg_confidence = 0.5 * (p0 + (1 - p1))
 
         return avg_confidence
+    
+    def get_log_score(self, x0_test, x1_test):
+        """
+        Computes log score for the current parameters on the given test inputs
+        """
+        x0 = torch.tensor(self.normalize(x0_test), dtype=torch.float, requires_grad=False, device=self.device)
+        x1 = torch.tensor(self.normalize(x1_test), dtype=torch.float, requires_grad=False, device=self.device)
+        with torch.no_grad():
+            p0, p1 = self.best_probe(x0), self.best_probe(x1)
+        avg_confidence = 0.5*(p0 + (1-p1))
+        log_score = np.log(avg_confidence)
+        log_score_alt = np.log(1 - avg_confidence)
+        score_res = max(np.mean(log_score), np.mean(log_score_alt))
+        return score_res
 
     def get_acc(self, x0_test, x1_test, y_test):
         """
